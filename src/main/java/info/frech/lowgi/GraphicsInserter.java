@@ -56,7 +56,6 @@ import com.sun.star.uno.XComponentContext;
 import mediautil.image.jpeg.*;
 
 import java.io.*;
-import java.util.Arrays;
 
 
 public class GraphicsInserter {
@@ -151,11 +150,11 @@ public class GraphicsInserter {
 
 //        byte[] imageBytes = bytesFromFile(file);
 
-        byte[] imageBytes = loadAndRotateImage(file);
+        CookedImage cookedImage = loadAndRotateImage(file);
 
         PropertyValue[] propValues = new PropertyValue[]{new PropertyValue()};
         propValues[0].Name = "InputStream";
-        propValues[0].Value = new ByteArrayToXInputStreamAdapter(imageBytes);
+        propValues[0].Value = new ByteArrayToXInputStreamAdapter(cookedImage.getImage());
 
         XGraphic xGraphic = UnoRuntime.queryInterface(XGraphic.class, xGraphicProvider.queryGraphic(propValues));
 
@@ -179,7 +178,7 @@ public class GraphicsInserter {
 
         System.out.println(sz.Width + "/" + sz.Height + " = " + ratio);
 
-        int fixedWidth = 10000;
+        int fixedWidth = 8500;
         xPropSet.setPropertyValue("Width", Integer.valueOf(fixedWidth));
         //xPropSet.setPropertyValue("Height", Integer.valueOf(fixedWidth));
         xPropSet.setPropertyValue("Height", Integer.valueOf((int) (fixedWidth / ratio)));
@@ -190,6 +189,11 @@ public class GraphicsInserter {
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
             xText.insertTextContent(xTextCursor, xTextContent, false);
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+            xText.insertString(xTextCursor, cookedImage.getDate(), false);
+            xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+            xText.insertString(xTextCursor, cookedImage.getFileName(), false);
+            xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+
         } catch (Exception exception) {
             System.out.println("Could not insert Content");
             exception.printStackTrace(System.err);
@@ -210,9 +214,10 @@ public class GraphicsInserter {
         }
     }
 
-    public static byte[] loadAndRotateImage(File imageFile) {
+    public static CookedImage loadAndRotateImage(File imageFile) {
 
         try {
+            CookedImage result = new CookedImage();
             // Read image EXIF data
             LLJTran llj = new LLJTran(imageFile);
             llj.read(LLJTran.READ_INFO, true);
@@ -223,6 +228,10 @@ public class GraphicsInserter {
             Exif exif = (Exif) imageInfo;
             int orientation = 1;
             Entry orientationTag = exif.getTagValue(Exif.ORIENTATION, true);
+            Entry dateTag = exif.getTagValue(Exif.DATETIME, true);
+            String d = dateTag.toString();
+            result.setDate(d.substring(0,d.length()-1));
+
             if (orientationTag != null) orientation = (Integer) orientationTag.getValue(0);
 
             // Determine required transform operation
@@ -238,7 +247,9 @@ public class GraphicsInserter {
 
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 llj.save(outputStream, LLJTran.OPT_WRITE_ALL);
-                return outputStream.toByteArray();
+                result.setImage(outputStream.toByteArray());
+                result.setFileName(imageFile.getName());
+                return result;
 
             } finally {
                 llj.freeMemory();

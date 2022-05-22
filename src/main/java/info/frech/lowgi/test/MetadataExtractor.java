@@ -45,7 +45,7 @@ public class MetadataExtractor
 {
     public static void main(String[] args)
     {
-        File file = new File("/home/gabi/Temp/Lamm 20 Abrechnung Fotos/DSC00035.JPG");
+        File file = new File(args[0]);
 
         try {
             // We are only interested in handling
@@ -69,38 +69,6 @@ public class MetadataExtractor
         }
     }
 
-    /**
-     * Write all extracted values to stdout.
-     */
-    private static void print(Metadata metadata, String method)
-    {
-        System.out.println();
-        System.out.println("-------------------------------------------------");
-        System.out.print(' ');
-        System.out.print(method);
-        System.out.println("-------------------------------------------------");
-        System.out.println();
-
-        //
-        // A Metadata object contains multiple Directory objects
-        //
-        for (Directory directory : metadata.getDirectories()) {
-
-            //
-            // Each Directory stores values in Tag objects
-            //
-            for (Tag tag : directory.getTags()) {
-                System.out.println(tag);
-            }
-
-            //
-            // Each Directory may also contain error messages
-            //
-            for (String error : directory.getErrors()) {
-                System.err.println("ERROR: " + error);
-            }
-        }
-    }
 
     private static void print(Exception exception)
     {

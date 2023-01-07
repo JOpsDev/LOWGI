@@ -37,12 +37,42 @@
             <version>${libre.office.version}</version>
         </dependency>
 
-
+        <!-- to extract keywords from images -->
         <dependency>
             <groupId>com.drewnoakes</groupId>
             <artifactId>metadata-extractor</artifactId>
             <version>2.18.0</version>
         </dependency>
+
+        <!-- command line parsing -->
+        <!--dependency>
+            <groupId>com.beust</groupId>
+            <artifactId>jcommander</artifactId>
+            <version>1.71</version>
+        </dependency-->
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>info.frech.lowgi.SortingGraphicsInserter</mainClass>
+                    <arguments>
+                        <argument>"picturesToImport"</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

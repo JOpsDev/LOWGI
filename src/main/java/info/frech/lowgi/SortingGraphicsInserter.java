@@ -41,11 +41,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Collection;
-import java.util.Date;
+import java.util.*;
+import java.util.stream.Collectors;
 
+public class SortingGraphicsInserter {
 
-public class GraphicsInserter {
+    private static List<String> ignoredKeywords = List.of("Kornwestheim", "25 Auswahl A", "25 Auswahl B", "Kornwestheim AmStadtgarten25");
+
     public static void main(String args[]) {
         if (args.length < 1) {
             System.out.println("usage: java -jar GraphicsInserter.jar \"<path to directory>\"");
@@ -91,9 +93,13 @@ public class GraphicsInserter {
                 File sourceDir = new File(args[0]);
                 File[] files = sourceDir.listFiles((file, name) -> name.toLowerCase().endsWith(".jpg"));
 
-                for (File file : files) {
-                    embedGraphics(xContext, xMCF, xMSFDoc, xText, xTextCursor, file);
+                List<CookedImage> cookedImages = Arrays.stream(files).map(f -> precookImage(f)).sorted((Comparator.comparing(CookedImage::getTags))).collect(Collectors.toList());
+
+                for (CookedImage image : cookedImages) {
+                    embedGraphics(xContext, xMCF, xMSFDoc, xText, xTextCursor, image);
+
                 }
+
             } catch (Exception exception) {
                 exception.printStackTrace();
 
@@ -107,9 +113,19 @@ public class GraphicsInserter {
         System.exit(0);
     }
 
-    private static void embedGraphics(XComponentContext xContext, XMultiComponentFactory xMCF, XMultiServiceFactory xMSFDoc, XText xText, XTextCursor xTextCursor, File file) throws com.sun.star.uno.Exception, IOException {
 
+    private static CookedImage precookImage(File file) {
         System.out.println("now " + file);
+        CookedImage cookedImage = loadAndRotateImage(file);
+        List<String> strings = KeywordExtractor.gatherKeywords(file);
+        strings.removeAll(ignoredKeywords);
+        Collections.sort(strings);
+        String keywords = String.join(", ", strings);
+        cookedImage.setTags(keywords);
+        return cookedImage;
+    }
+
+    private static void embedGraphics(XComponentContext xContext, XMultiComponentFactory xMCF, XMultiServiceFactory xMSFDoc, XText xText, XTextCursor xTextCursor, CookedImage image) throws com.sun.star.uno.Exception, IOException {
 
         Object oGraphic = null;
         try {
@@ -126,22 +142,11 @@ public class GraphicsInserter {
         // Querying for the interface XPropertySet on GraphicObject
         XPropertySet xPropSet = UnoRuntime.queryInterface(XPropertySet.class, oGraphic);
 
-        StringBuffer sUrl = new StringBuffer("file://" + file.getCanonicalPath());
-        System.out.println("insert graphic \"" + sUrl + "\"");
-
         XGraphicProvider xGraphicProvider = UnoRuntime.queryInterface(XGraphicProvider.class, xMCF.createInstanceWithContext("com.sun.star.graphic.GraphicProvider", xContext));
-
-//        PropertyValue[] aMediaProps = new PropertyValue[]{new PropertyValue()};
-//        aMediaProps[0].Name = "URL";
-//        aMediaProps[0].Value = sUrl.toString();
-
-//        byte[] imageBytes = bytesFromFile(file);
-
-        CookedImage cookedImage = loadAndRotateImage(file);
 
         PropertyValue[] propValues = new PropertyValue[]{new PropertyValue()};
         propValues[0].Name = "InputStream";
-        propValues[0].Value = new ByteArrayToXInputStreamAdapter(cookedImage.getImage());
+        propValues[0].Value = new ByteArrayToXInputStreamAdapter(image.getImage());
 
         XGraphic xGraphic = UnoRuntime.queryInterface(XGraphic.class, xGraphicProvider.queryGraphic(propValues));
 
@@ -165,24 +170,26 @@ public class GraphicsInserter {
 
         System.out.println(sz.Width + "/" + sz.Height + " = " + ratio);
 
-        int fixedWidth = 7500;
+        int fixedWidth;
+        if (ratio < 1.0) {
+            fixedWidth = 8000;
+        } else {
+            fixedWidth = 15000;
+        }
+
         xPropSet.setPropertyValue("Width", Integer.valueOf(fixedWidth));
         xPropSet.setPropertyValue("Height", Integer.valueOf((int) (fixedWidth / ratio)));
-
-        Collection<String> strings = KeywordExtractor.gatherKeywords(file);
-        String keywords = String.join(", ", strings);
 
         try {
             // Inserting the content
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
             xText.insertTextContent(xTextCursor, xTextContent, false);
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
-            xText.insertString(xTextCursor, cookedImage.getDate(), false);
+            xText.insertString(xTextCursor, image.getDate(), false);
             xText.insertControlCharacter(xTextCursor, ControlCharacter.HARD_SPACE, false);
-            xText.insertString(xTextCursor, cookedImage.getFileName(), false);
+            xText.insertString(xTextCursor, image.getFileName(), false);
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
-            xText.insertString(xTextCursor, keywords, false);
-//            xText.insertString(xTextCursor, cookedImage.getComment(), false);
+            xText.insertString(xTextCursor, image.getTags(), false);
             xText.insertControlCharacter(xTextCursor, ControlCharacter.PARAGRAPH_BREAK, false);
 
         } catch (Exception exception) {
@@ -269,6 +276,3 @@ public class GraphicsInserter {
         return comment;
     }
 }
-
-
-/* vim:set shiftwidth=4 softtabstop=4 expandtab: */
